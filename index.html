@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Kastamonu Üniversitesi Web Sayfaları Durum Takibi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .pulse { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: .4 } 50% { opacity: 1 } 100% { opacity: .4 } }
+        .tab-btn.active { background-color: #4f46e5 !important; color: white !important; }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #f43f5e; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="manualModal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200 mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-900">Manuel Site Kontrolü</h3>
+                <button onclick="toggleModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+            </div>
+            <input type="text" id="manualUrl" placeholder="https://kastamonu.edu.tr" class="w-full px-4 py-2 rounded-lg border mb-4 outline-none focus:ring-2 focus:ring-indigo-500">
+            <button id="runManualCheck" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium">Sorgula</button>
+        </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto p-6">
+        <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <img src="images/websitekontrol.png" alt="Logo" class="w-12 h-12 md:w-16 md:h-16 object-contain" />
+                <div>
+                    <h1 class="text-lg md:text-2xl font-bold text-slate-900">Kastamonu Üniversitesi Web Durum Takibi</h1>
+                    <p class="text-xs md:text-sm text-slate-600 italic">Bilgi İşlem Daire Başkanlığı</p>
+                </div>
+            </div>
+            <button onclick="toggleModal()" class="px-4 py-2 border-2 border-indigo-600 text-indigo-600 rounded-lg text-sm font-bold hover:bg-indigo-600 hover:text-white transition-all">
+                🔍 Manuel Kontrol
+            </button>
+        </header>
+
+        <section class="mb-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center gap-8">
+                <div class="w-40 h-40 flex-shrink-0">
+                    <canvas id="healthChart"></canvas>
+                </div>
+                <div class="flex-1 text-center md:text-left">
+                    <h2 class="text-xl font-bold text-slate-800 mb-1">Genel Sistem Sağlığı</h2>
+                    <p class="text-xs text-slate-500 mb-4 uppercase tracking-widest font-semibold">
+                        Toplam İncelenen Birim: <span id="grandTotalCount" class="text-indigo-600">...</span>
+                    </p>
+                    
+                    <div id="initialLoader" class="space-y-2 mb-4">
+                        <div class="text-sm font-medium text-indigo-600" id="globalProgressText">Sistem taranıyor...</div>
+                        <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div id="globalProgressBar" class="h-full bg-indigo-600 transition-all w-0"></div>
+                        </div>
+                    </div>
+                    <div id="healthSummary" class="hidden flex gap-4 justify-center md:justify-start">
+                        <div class="px-4 py-2 bg-emerald-50 rounded-lg border border-emerald-100 text-center">
+                            <div class="text-[10px] text-emerald-600 font-bold uppercase">Aktif</div>
+                            <div class="text-xl font-black text-emerald-700" id="totalUpCount">0</div>
+                        </div>
+                        <div class="px-4 py-2 bg-rose-50 rounded-lg border border-rose-100 text-center">
+                            <div class="text-[10px] text-rose-600 font-bold uppercase">Pasif</div>
+                            <div class="text-xl font-black text-rose-700" id="totalDownCount">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                    <span class="w-2 h-2 bg-rose-500 rounded-full"></span> 
+                    Erişilemeyen Servisler
+                </h3>
+                <div id="failedList" class="h-[120px] overflow-y-auto custom-scroll space-y-2 text-xs">
+                    <p class="text-slate-400 italic">Sistem taraması bekleniyor...</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-6">
+            <div class="flex flex-wrap gap-2 mb-4">
+                <button data-group="anasayfa" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Anasayfa</button>
+                <button data-group="fakulte" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Fakülteler</button>
+                <button data-group="ensyo" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Enstitü-Yüksekokullar</button>
+                <button data-group="myo" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Meslek Yüksekokulları</button>
+                <button data-group="koordinator" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Koordinatörlükler</button>
+                <button data-group="aum" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Araştırma Uygulama Merkezleri</button>
+                <button data-group="idari" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">İdari Birimler</button>
+                <button data-group="projelerjoomla" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Projeler Joomla</button>
+                <button data-group="projelerwordpress" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Projeler Wordpress</button>
+                <button data-group="yazilimlarimiz" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Yazılımlarımız</button>
+                <button data-group="diger" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Diğer</button>
+                <button data-group="disyazilimlar" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Dış Yazılımlar</button>
+            </div>
+            
+            <div class="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 mb-4">
+                <span class="text-sm text-slate-600">
+                    Grup İçeriği: <strong id="currentCount" class="text-indigo-600">0</strong> birim
+                    <span class="ml-2 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-md">● <strong id="activeCount">0</strong></span>
+                    <span class="ml-1 px-2 py-0.5 bg-rose-50 text-rose-600 rounded-md">● <strong id="pasiveCount">0</strong></span>
+                </span>
+            </div>
+        </section>
+
+        <div class="rounded-2xl overflow-x-auto shadow-md border border-slate-200 bg-white min-h-[300px]">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                    <tr class="text-left text-slate-500 uppercase tracking-wider">
+                        <th class="px-6 py-4 font-semibold">Birim/Site Adı</th>
+                        <th class="px-6 py-4 font-semibold">Durum</th>
+                        <th class="px-6 py-4 font-semibold">Gecikme</th>
+                        <th class="px-6 py-4 font-semibold text-right">Son Kontrol</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody" class="divide-y divide-slate-100">
+                    <tr><td colspan="4" class="p-10 text-center text-slate-400 italic">Lütfen incelemek istediğiniz bir grubu yukarıdan seçin.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <footer class="mt-12 pb-8 border-t border-slate-200 pt-8">
+            <div class="grid md:grid-cols-2 gap-8 items-start">
+                <div class="space-y-3">
+                    <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Hakkında</h2>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        Bu platform, <strong>Kastamonu Üniversitesi</strong> dijital ekosisteminde yer alan tüm web servislerinin erişilebilirliğini izlemek amacıyla
+                        <strong>Kastamonu Üniversitesi Bilgi İşlem Daire Başkanlığı</strong> tarafından geliştirilmiştir.
+                    </p>
+                </div>
+                <div class="space-y-3">
+                    <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Hizmet Amacı</h2>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        Kastamonu Üniversitesi web sitelerinin hız ve aktiflik durumunu kontrol eden araç; öğrencilerin, akademik ve idari personelin
+                        üniversite servislerine kesintisiz erişimini takip etmelerine olanak tanır.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-10 pt-8 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-y-6">
+
+                <div class="text-[11px] text-slate-400 font-medium tracking-wide order-2 md:order-1">
+                    © 2025 <span class="text-slate-500">Kastamonu Üniversitesi</span> — Tüm hakları saklıdır.
+                </div>
+
+                <div class="flex items-center gap-6 order-1 md:order-2">
+                    <div class="flex items-center gap-5">
+                        <a href="https://kastamonu.edu.tr"
+                           class="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 transition-all underline decoration-transparent hover:decoration-indigo-300 underline-offset-4"
+                           title="Kastamonu Üniversitesi Resmi Web Sitesi">
+                            Kastamonu Üniversitesi Resmi Web Sitesi
+                        </a>
+
+                        <span class="text-slate-200 text-lg select-none">/</span>
+
+                        <a href="https://bidb.kastamonu.edu.tr"
+                           class="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 transition-all underline decoration-transparent hover:decoration-indigo-300 underline-offset-4"
+                           title="Bilgi İşlem Daire Başkanlığı">
+                            Bilgi İşlem Daire Başkanlığı
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const GROUPS = {
+            anasayfa: ["https://kastamonu.edu.tr"],
+            fakulte: ["https://egitim.kastamonu.edu.tr", "https://fen.kastamonu.edu.tr", "https://gstf.kastamonu.edu.tr", "https://iibf.kastamonu.edu.tr", "https://ilahiyat.kastamonu.edu.tr", "https://iletisim.kastamonu.edu.tr", "https://itbf.kastamonu.edu.tr", "https://mmf.kastamonu.edu.tr", "https://orman.kastamonu.edu.tr", "https://sbf.kastamonu.edu.tr", "https://dishek.kastamonu.edu.tr", "https://sporbilimleri.kastamonu.edu.tr", "https://turizm.kastamonu.edu.tr", "https://tip.kastamonu.edu.tr", "https://veteriner.kastamonu.edu.tr"],
+            ensyo: ["https://havacilik.kastamonu.edu.tr", "https://ydyo.kastamonu.edu.tr", "https://lisansustu.kastamonu.edu.tr"],
+            myo: ["https://abana.kastamonu.edu.tr", "https://arac.kastamonu.edu.tr", "https://bozkurt.kastamonu.edu.tr", "https://cide.kastamonu.edu.tr", "https://catalzeytin.kastamonu.edu.tr", "https://daday.kastamonu.edu.tr", "https://devrekani.kastamonu.edu.tr", "https://ihsangazi.kastamonu.edu.tr", "https://inebolu.kastamonu.edu.tr", "https://kmyo.kastamonu.edu.tr", "https://kure.kastamonu.edu.tr", "https://taskopru.kastamonu.edu.tr", "https://tosya.kastamonu.edu.tr"],
+            koordinator: ["https://bidek.kastamonu.edu.tr", "https://kubap.kastamonu.edu.tr", "https://iro.kastamonu.edu.tr", "https://emk.kastamonu.edu.tr", "https://erasmus.kastamonu.edu.tr", "https://farabi.kastamonu.edu.tr", "https://isg.kastamonu.edu.tr", "https://orhun.kastamonu.edu.tr", "https://isbirligi.kastamonu.edu.tr", "https://mevlana.kastamonu.edu.tr", "https://iso.kastamonu.edu.tr", "https://bologna.kastamonu.edu.tr", "https://rankings.kastamonu.edu.tr", "https://engelsiz.kastamonu.edu.tr", "https://kalite.kastamonu.edu.tr", "https://kuosd.kastamonu.edu.tr", "https://sifiratik.kastamonu.edu.tr", "https://surdurulebilirlik.kastamonu.edu.tr", "https://veri.kastamonu.edu.tr", "https://yabancidiller.kastamonu.edu.tr", "https://yapayzeka.kastamonu.edu.tr", "https://ylsy.kastamonu.edu.tr"],
+            aum: ["https://ahsap.kastamonu.edu.tr", "https://cbsuzal.kastamonu.edu.tr", "https://cocuk.kastamonu.edu.tr", "https://icsu.kastamonu.edu.tr", "https://islamekonomisi.kastamonu.edu.tr", "https://kariyer.kastamonu.edu.tr", "https://kadinveaile.kastamonu.edu.tr", "https://merlab.kastamonu.edu.tr", "https://kasusem.kastamonu.edu.tr", "https://kultursanat.kastamonu.edu.tr", "https://muhammedihsanoguz.kastamonu.edu.tr", "https://ormanurunleri.kastamonu.edu.tr", "https://ordam.kastamonu.edu.tr", "https://otu.kastamonu.edu.tr", "https://susporlari.kastamonu.edu.tr", "https://ssv.kastamonu.edu.tr", "https://tabiatturizmi.kastamonu.edu.tr", "https://tarkem.kastamonu.edu.tr", "https://tropik.kastamonu.edu.tr", "https://turkdunyasi.kastamonu.edu.tr", "https://turkhalkbilimi.kastamonu.edu.tr", "https://tomer.kastamonu.edu.tr", "https://kuzem.kastamonu.edu.tr", "https://uyem.kastamonu.edu.tr"],
+            projelerjoomla: ["https://ihtisas2209.kastamonu.edu.tr", "https://tubitakkye2237.kastamonu.edu.tr", "https://patent2237.kastamonu.edu.tr", "https://depremyapizemin.kastamonu.edu.tr", "https://kariyer2237.kastamonu.edu.tr", "https://ccai2237.kastamonu.edu.tr", "https://usim2237.kastamonu.edu.tr", "https://cocukistismaribirincilonleme.kastamonu.edu.tr", "https://kureseliklimdegisikligi.kastamonu.edu.tr", "https://biyometri2237.kastamonu.edu.tr", "https://4005yenilikciuygulamalar.kastamonu.edu.tr", "https://icam25.kastamonu.edu.tr", "https://bilimselmakale.kastamonu.edu.tr", "https://yayinetigi.kastamonu.edu.tr", "https://spordateknolojiegitimi2237.kastamonu.edu.tr", "https://yasliegzersizegitimi2237.kastamonu.edu.tr", "https://ogretimdeyapayzeka.kastamonu.edu.tr", "https://yapayzekaicerik.kastamonu.edu.tr", "https://senai.kastamonu.edu.tr", "https://dijitalcumhuriyetbilim.kastamonu.edu.tr", "https://futurepolymat.kastamonu.edu.tr/", "https://akademisyen2237.kastamonu.edu.tr", "https://dendro.kastamonu.edu.tr", "https://bby.kastamonu.edu.tr", "https://enfito.kastamonu.edu.tr", "https://integs.kastamonu.edu.tr", "https://emos.kastamonu.edu.tr", "https://ugtak2023.kastamonu.edu.tr", "https://icefc2025.kastamonu.edu.tr", "https://ultzk2026.kastamonu.edu.tr", "https://utk24.kastamonu.edu.tr", "https://ihtisascalistay.kastamonu.edu.tr", "https://skdm.kastamonu.edu.tr", "https://ttocalistay.kastamonu.edu.tr", "https://palinoloji.kastamonu.edu.tr", "https://tropik.kastamonu.edu.tr"],
+            projelerwordpress: ["https://ecoprint.kastamonu.edu.tr", "https://icits2024.kastamonu.edu.tr", "https://iklim.kastamonu.edu.tr", "https://iklimvizyonu.kastamonu.edu.tr", "https://makale2237.kastamonu.edu.tr", "https://teknogirisim.kastamonu.edu.tr"],
+            idari: ["https://genelsekreterlik.kastamonu.edu.tr", "https://bidb.kastamonu.edu.tr", "https://imidb.kastamonu.edu.tr", "https://kddb.kastamonu.edu.tr", "https://oidb.kastamonu.edu.tr", "https://pdb.kastamonu.edu.tr", "https://sks.kastamonu.edu.tr", "https://strateji.kastamonu.edu.tr", "https://yidb.kastamonu.edu.tr", "https://hukuk.kastamonu.edu.tr", "https://donersermaye.kastamonu.edu.tr", "https://icdenetim.kastamonu.edu.tr"],
+            yazilimlarimiz: ["https://dijitalkimlik.kastamonu.edu.tr/", "https://dtts.kastamonu.edu.tr/", "https://dsys.kastamonu.edu.tr/Kullanici/Giris", "https://eimza.kastamonu.edu.tr/", "https://harc.kastamonu.edu.tr/", "https://kvys.kastamonu.edu.tr", "https://lab.kastamonu.edu.tr/", "https://mesai.kastamonu.edu.tr/login", "https://randevu.kastamonu.edu.tr/", "https://robot.kastamonu.edu.tr/", "https://isas.kastamonu.edu.tr/", "https://derslik.kastamonu.edu.tr/", "https://ime.kastamonu.edu.tr/", "https://mes.kastamonu.edu.tr/", "https://kunet.kastamonu.edu.tr/", "https://ozyes.kastamonu.edu.tr", "https://mmfyazokulu.kastamonu.edu.tr/", "https://akademiktakvim.kastamonu.edu.tr/", "https://iskurgenclik.kastamonu.edu.tr/", "https://yoklama.kastamonu.edu.tr"],
+            disyazilimlar: ["https://ubys.kastamonu.edu.tr"],
+            diger: ["https://etikkurullar.kastamonu.edu.tr", "https://turkdili.kastamonu.edu.tr", "https://aiit.kastamonu.edu.tr", "https://enformatik.kastamonu.edu.tr", "https://cidekonukevi.kastamonu.edu.tr", "https://konukevi.kastamonu.edu.tr", "https://kurumsal.kastamonu.edu.tr", "https://aday.kastamonu.edu.tr", "https://eduroam.kastamonu.edu.tr", "https://hayvanhastanesi.kastamonu.edu.tr", "https://basin.kastamonu.edu.tr", "https://kampusradyo.kastamonu.edu.tr", "https://topluluklar.kastamonu.edu.tr", "https://deneyhayvanlari.kastamonu.edu.tr", "https://sosyalofis.kastamonu.edu.tr", "https://ayyildiz.kastamonu.edu.tr", "https://formasyon.kastamonu.edu.tr", "https://kvkk.kastamonu.edu.tr", "https://fotografvegorselsanatlartoplulugu.kastamonu.edu.tr", "https://senin1dakikan.kastamonu.edu.tr", "https://parlayanyildiz.kastamonu.edu.tr"]
+       };
+
+        const SITE_LABELS = {
+
+            "genelsekreterlik.kastamonu.edu.tr": "Genel Sekreterlik",
+
+            "bidb.kastamonu.edu.tr": "Bilgi İşlem Daire Başkanlığı",
+
+            "imidb.kastamonu.edu.tr": "İdari ve Mali İşler Daire Başkanlığı",
+
+            "kddb.kastamonu.edu.tr": "Kütüphane ve Dokümantasyon Daire Başkanlığı",
+
+            "oidb.kastamonu.edu.tr": "Öğrenci İşleri Daire Başkanlığı",
+
+            "pdb.kastamonu.edu.tr": "Personel Daire Başkanlığı",
+
+            "sks.kastamonu.edu.tr": "Sağlık, Kültür ve Spor Daire Başkanlığı",
+
+            "strateji.kastamonu.edu.tr": "Strateji Daire Başkanlığı",
+
+            "yidb.kastamonu.edu.tr": "Yapı İşleri Daire Başkanlığı",
+
+            "hukuk.kastamonu.edu.tr": "Hukuk Müşavirliği",
+
+            "donersermaye.kastamonu.edu.tr": "Döner Sermaye İşletme Müdürlüğü",
+
+            "icdenetim.kastamonu.edu.tr": "İç Denetim Birimi",
+
+            "egitim.kastamonu.edu.tr": "Eğitim Fakültesi",
+
+            "fen.kastamonu.edu.tr": "Fen Fakültesi",
+
+            "gstf.kastamonu.edu.tr": "Güzel Sanatlar ve Tasarım Fakültesi",
+
+            "iibf.kastamonu.edu.tr": "İktisadi ve İdari Bilimler Fakültesi",
+
+            "ilahiyat.kastamonu.edu.tr": "İlahiyat Fakültesi",
+
+            "iletisim.kastamonu.edu.tr": "İletişim Fakültesi",
+
+            "itbf.kastamonu.edu.tr": "İnsan ve Toplum Bilimleri Fakültesi",
+
+            "mmf.kastamonu.edu.tr": "Mühendislik ve Mimarlık Fakültesi",
+
+            "orman.kastamonu.edu.tr": "Orman Fakültesi",
+
+            "sbf.kastamonu.edu.tr": "Sağlık Bilimleri Fakültesi",
+
+            "dishek.kastamonu.edu.tr": "Diş Hekimliği Fakültesi",
+
+            "sporbilimleri.kastamonu.edu.tr": "Spor Bilimleri Fakültesi",
+
+            "turizm.kastamonu.edu.tr": "Turizm Fakültesi",
+
+            "tip.kastamonu.edu.tr": "Tıp Fakültesi",
+
+            "veteriner.kastamonu.edu.tr": "Veteriner Fakültesi",
+
+            "lisansustu.kastamonu.edu.tr": "Lisansüstü Eğitim Enstitüsü",
+
+            "havacilik.kastamonu.edu.tr": "Sivil Havacılık Yüksekokulu",
+
+            "ydyo.kastamonu.edu.tr": "Yabancı Diller Yüksekokulu",
+
+            "kastamonu.edu.tr": "Rektörlük / Anasayfa",
+
+            "abana.kastamonu.edu.tr": "Abana Sabahat Mesut Yılmaz Meslek Yüksekokulu",
+
+            "arac.kastamonu.edu.tr": "Araç Rafet Vergili Meslek Yüksekokulu",
+
+            "bozkurt.kastamonu.edu.tr": "Bozkurt Meslek Yüksekokulu",
+
+            "cide.kastamonu.edu.tr": "Cide Rıfat Ilgaz Meslek Yüksekokulu",
+
+            "catalzeytin.kastamonu.edu.tr": "Çatalzeytin Meslek Yüksekokulu",
+
+            "daday.kastamonu.edu.tr": "Daday Nafi ve Ümit Çeri Meslek Yüksekokulu",
+
+            "devrekani.kastamonu.edu.tr": "Devrekani TOBB Meslek Yüksekokulu",
+
+            "ihsangazi.kastamonu.edu.tr": "İhsangazi Meslek Yüksekokulu",
+
+            "inebolu.kastamonu.edu.tr": "İnebolu Meslek Yüksekokulu",
+
+            "kmyo.kastamonu.edu.tr":"Kastamonu Meslek Yüksekokulu",
+
+            "kure.kastamonu.edu.tr": "Küre Meslek Yüksekokulu",
+
+            "taskopru.kastamonu.edu.tr": "Taşköprü Meslek Yüksekokulu",
+
+            "tosya.kastamonu.edu.tr": "Tosya Meslek Yüksekokulu",
+
+            "bidek.kastamonu.edu.tr": "Bilimsel Dergiler Koordinatörlüğü",
+
+            "kubap.kastamonu.edu.tr": "Bilimsel Araştırma Projeleri Koordinasyon Birimi",
+
+            "iro.kastamonu.edu.tr": "Dış İlişkiler Koordinatörlüğü",
+
+            "emk.kastamonu.edu.tr": "Eğitimde Mülkiyet Koordinatörlüğü",
+
+            "erasmus.kastamonu.edu.tr": "Erasmus Koordinatörlüğü",
+
+            "farabi.kastamonu.edu.tr": "Farabi Koordinatörlüğü",
+
+            "isg.kastamonu.edu.tr": "İş Sağlığı ve Güvenliği Koordinatörlüğü",
+
+            "orhun.kastamonu.edu.tr": "Orhun Değişim Programı Koordinatörlüğü",
+
+            "isbirligi.kastamonu.edu.tr": "İkili Anlaşmalar ve Protokoller Koordinatörlüğü",
+
+            "mevlana.kastamonu.edu.tr": "Mevlana Koordinatörlüğü",
+
+            "iso.kastamonu.edu.tr": "Uluslararası Öğrenci Koordinatörlüğü",
+
+            "bologna.kastamonu.edu.tr": "Bologna Süreci Koordinatörlüğü",
+
+            "rankings.kastamonu.edu.tr": "Uluslararasılaştırma Koordinatörlüğü",
+
+            "engelsiz.kastamonu.edu.tr": "Engelsiz Üniversite Koordinatörlüğü",
+
+            "kalite.kastamonu.edu.tr": "Kalite Koordinatörlüğü",
+
+            "kuosd.kastamonu.edu.tr": "Ortak Seçmeli Dersler Koordinatörlüğü",
+
+            "sifiratik.kastamonu.edu.tr": "Sıfır Atık Koordinatörlüğü",
+
+            "surdurulebilirlik.kastamonu.edu.tr": "Sürdürülebilirlik Koordinatörlüğü",
+
+            "veri.kastamonu.edu.tr": "Veri Analizi İzleme ve Değerlendirme Koordinatörlüğü",
+
+            "yabancidiller.kastamonu.edu.tr": "Yabancı Diller Eğitim Araştırma ve Sınav Koordinatörlüğü",
+
+            "yapayzeka.kastamonu.edu.tr": "Yapay Zeka Koordinatörlüğü",
+
+            "ylsy.kastamonu.edu.tr": "YLSY Burs Koordinatörlüğü",
+
+            "ahsap.kastamonu.edu.tr": "Ahşap Kültürünü Uygulama ve Araştırma Merkezi",
+
+            "cbsuzal.kastamonu.edu.tr": "Coğrafi Bilgi Sistemleri ve Uzaktan Algılama Uygulama ve Araştırma Merkezi",
+
+            "cocuk.kastamonu.edu.tr": "Çocuk Eğitim Uygulama ve Araştırma Merkezi",
+
+            "icsu.kastamonu.edu.tr": "İç Su ve Deniz Balıkları Üretim, Uygulama ve Araştırma Merkezi",
+
+            "islamekonomisi.kastamonu.edu.tr": "İslam Ekonomisi Uygulama ve Araştırma Merkezi",
+
+            "kariyer.kastamonu.edu.tr": "Gençlik ve Kariyer Geliştirme Uygulama ve Araştırma Merkezi",
+
+            "kadinveaile.kastamonu.edu.tr": "Kadın ve Aile Çalışmaları Uygulama ve Araştırma Merkezi",
+
+            "merlab.kastamonu.edu.tr": "Merkezi Araştırma Laboratuvarı Uygulama ve Araştırma Merkezi",
+
+            "kasusem.kastamonu.edu.tr": "Sürekli Eğitim Araştırma ve Uygulama Merkezi",
+
+            "kultursanat.kastamonu.edu.tr": "Kültür Sanat Uygulama ve Araştırma Merkezi",
+
+            "muhammedihsanoguz.kastamonu.edu.tr": "Muhammed İhsan Oğuz Uygulama ve Araştırma Merkezi",
+
+            "ormanurunleri.kastamonu.edu.tr": "Orman Ürünleri Uygulama ve Araştırma Merkezi",
+
+            "ordam.kastamonu.edu.tr": "Orta Doğu Araştırmaları Uygulama ve Araştırma Merkezi",
+
+            "otu.kastamonu.edu.tr": "Osmanlı Türkçesi Uygulama ve Araştırma Merkezi",
+
+            "susporlari.kastamonu.edu.tr": "Su Sporları, Su ve Sualtı Uygulama ve Araştırma Merkezi",
+
+            "ssv.kastamonu.edu.tr": "Şeyh Şaban-ı Veli Değerleri Eğitimi Uygulama ve Araştırma Merkezi",
+
+            "tabiatturizmi.kastamonu.edu.tr": "Tabiat Turizmi Araştırma ve Uygulama Merkezi",
+
+            "tarkem.kastamonu.edu.tr": "Tarih ve Arkeoloji Uygulama ve Araştırma Merkezi",
+
+            "tropik.kastamonu.edu.tr": "Tropik Çalışmalar Uygulama ve Araştırma Merkezi",
+
+            "turkdunyasi.kastamonu.edu.tr": "Türk Dünyası Uygulama ve Araştırma Merkezi",
+
+            "turkhalkbilimi.kastamonu.edu.tr": "Türk Halk Bilimi Araştırma ve Uygulama Merkezi",
+
+            "tomer.kastamonu.edu.tr": "Türkçe Öğretimi Uygulama ve Araştırma Merkezi",
+
+            "kuzem.kastamonu.edu.tr": "Uzaktan Eğitim Uygulama ve Araştırma Merkezi",
+
+            "uyem.kastamonu.edu.tr": "Üstün Yetenekliler Eğitim Uygulama ve Araştırma Merkezi",
+
+            "etikkurullar.kastamonu.edu.tr": "Etik Kurullar",
+
+            "turkdili.kastamonu.edu.tr": "Türk Dili Bölümü",
+
+            "aiit.kastamonu.edu.tr": "Atatürk İlkeleri ve İnkılap Tarihi Bölümü",
+
+            "enformatik.kastamonu.edu.tr": "Enformatik Bölümü",
+
+            "cidekonukevi.kastamonu.edu.tr": "Cide Konukevi",
+
+            "konukevi.kastamonu.edu.tr": "Konukevi",
+
+            "kurumsal.kastamonu.edu.tr": "Kurumsal Kimlik",
+
+            "aday.kastamonu.edu.tr": "Aday Öğrenci",
+
+            "eduroam.kastamonu.edu.tr": "Eduoam",
+
+            "hayvanhastanesi.kastamonu.edu.tr": "Hayvan Hastanesi",
+
+            "basin.kastamonu.edu.tr": "Basın Birimi",
+
+            "kampusradyo.kastamonu.edu.tr": "Kampus Radyo",
+
+            "topluluklar.kastamonu.edu.tr": "Topluluklar",
+
+            "deneyhayvanlari.kastamonu.edu.tr": "Deney Hayvanları",
+
+            "sosyalofis.kastamonu.edu.tr": "TTO Sosyal Ofis",
+
+            "ayyildiz.kastamonu.edu.tr": "Ay Yıldız Yaşam Kompleksi",
+
+            "formasyon.kastamonu.edu.tr": "Formasyon",
+
+            "kvkk.kastamonu.edu.tr": "KVKK",
+
+            "fotografvegorselsanatlartoplulugu.kastamonu.edu.tr": "Fotoğraf ve Görsel Sanatlar Topluluğu",
+
+            "senin1dakikan.kastamonu.edu.tr": "Senin 1 Dakikan",
+
+            "parlayanyildiz.kastamonu.edu.tr": "Parlayan Yıldız Konukevi",
+
+            "ubys.kastamonu.edu.tr": "Üniversite Bilgi Yönetim Sistemi"
+
+        };
+        let activeTotal = 0, pasiveTotal = 0, urls = [];
+        let globalUp = 0, globalDown = 0;
+        let myChart;
+
+        const fmtTime = (d) => d.toLocaleTimeString("tr-TR");
+        const getSiteLabel = (u) => {
+            const key = u.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+            return SITE_LABELS[key] || key;
+        };
+
+        function initChart(up, down) {
+            const ctx = document.getElementById('healthChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Aktif', 'Pasif'],
+                    datasets: [{
+                        data: [up, down],
+                        backgroundColor: ['#10b981', '#f43f5e'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { cutout: '75%', plugins: { legend: { display: false } } }
+            });
+        }
+
+        async function scanEntireSystem() {
+            const allUrls = [...new Set(Object.values(GROUPS).flat())];
+            const failedListDiv = document.getElementById('failedList');
+            failedListDiv.innerHTML = "";
+            
+            const total = allUrls.length;
+            // TOPLAM SAYI UI GÜNCELLEME
+            document.getElementById('grandTotalCount').textContent = total;
+
+            let completed = 0;
+            const queue = [...allUrls];
+
+            async function worker() {
+                while (queue.length > 0) {
+                    const u = queue.shift();
+                    try {
+                        await fetch(u, { mode: 'no-cors', cache: 'no-store' });
+                        globalUp++;
+                    } catch (e) {
+                        globalDown++;
+                        const item = document.createElement('div');
+                        item.className = "p-2 bg-rose-50 border-l-2 border-rose-500 text-rose-800 flex justify-between";
+                        item.innerHTML = `<span>${getSiteLabel(u)}</span> <span class="font-bold text-[10px]">ERİŞİLEMİYOR</span>`;
+                        failedListDiv.appendChild(item);
+                    }
+                    completed++;
+                    const pct = Math.round((completed / total) * 100);
+                    document.getElementById('globalProgressBar').style.width = pct + "%";
+                    document.getElementById('globalProgressText').textContent = `Tarama: %${pct}`;
+                }
+            }
+
+            await Promise.all(Array(15).fill(null).map(() => worker()));
+            if(globalDown === 0) failedListDiv.innerHTML = '<p class="text-emerald-500 font-medium">Harika! Tüm servisler aktif.</p>';
+            document.getElementById('initialLoader').classList.add('hidden');
+            document.getElementById('healthSummary').classList.remove('hidden');
+            document.getElementById('totalUpCount').textContent = globalUp;
+            document.getElementById('totalDownCount').textContent = globalDown;
+            initChart(globalUp, globalDown);
+        }
+
+        async function checkOne(u) {
+            const start = Date.now();
+            try {
+                await fetch(u, { mode: 'no-cors', cache: 'no-store' });
+                updateRow(u, { up: true, latency: Date.now() - start, when: new Date() });
+            } catch (e) {
+                updateRow(u, { up: false, latency: null, when: new Date() });
+            }
+        }
+
+        async function checkGroup() {
+            activeTotal = 0; pasiveTotal = 0;
+            for (const url of urls) { await checkOne(url); }
+        }
+
+        function renderRows() {
+            const tbody = document.getElementById("tbody");
+            tbody.innerHTML = "";
+            urls.forEach(u => {
+                const id = btoa(u).replace(/=/g, "");
+                const tr = document.createElement("tr");
+                tr.id = "row-" + id;
+                tr.className = "hover:bg-slate-50 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-medium"><a href="${u}" target="_blank" class="text-indigo-600 underline">${getSiteLabel(u)}</a></td>
+                    <td class="px-6 py-4"><span class="pulse text-slate-400 text-xs">Kontrol ediliyor...</span></td>
+                    <td class="px-6 py-4 text-slate-500 italic">–</td>
+                    <td class="px-6 py-4 text-slate-400 text-right">–</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.getElementById("currentCount").textContent = urls.length;
+        }
+
+        function updateRow(u, { up, latency, when }) {
+            const id = btoa(u).replace(/=/g, "");
+            const tr = document.getElementById("row-" + id);
+            if (!tr) return;
+            tr.children[1].innerHTML = up ? `<span class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold">AKTİF</span>` : `<span class="px-2 py-1 bg-rose-100 text-rose-700 rounded-full text-[10px] font-bold">PASİF</span>`;
+            tr.children[2].textContent = latency ? `${latency} ms` : "–";
+            tr.children[3].textContent = when ? fmtTime(when) : "–";
+            if (up) activeTotal++; else pasiveTotal++;
+            document.getElementById("activeCount").textContent = activeTotal;
+            document.getElementById("pasiveCount").textContent = pasiveTotal;
+            if (!up) tr.parentNode.prepend(tr);
+        }
+
+        document.querySelectorAll(".tab-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                urls = GROUPS[btn.dataset.group] || [];
+                renderRows();
+                checkGroup();
+            });
+        });
+
+        function toggleModal() { document.getElementById('manualModal').classList.toggle('hidden'); }
+        window.addEventListener("DOMContentLoaded", scanEntireSystem);
+    </script>
+</body>
+</html>
