@@ -41,3 +41,16 @@ Tarayicida ac:
 - E-posta veya kullanici adi + parola ile giris yapilir.
 - Basarili giris sonrasi ana izleme sayfasi acilir.
 - Giris yapmadan `/` ve `/index.html` erisimi kapatilidir.
+
+## 4) Arka Plan Izleme ve E-posta Alarmi
+
+Uygulama acik kaldigi surece arka planda URL kontrolu yapar.
+Bir site `AKTIF -> PASIF` olursa alarm maili gonderir.
+
+`appsettings.Production.json` icinde:
+
+- `Monitoring.Enabled`: `true`
+- `Monitoring.IntervalSeconds`: kontrol sikligi (ornek `300`)
+- `Smtp.Enabled`: `true` yap
+- `Smtp.Host`, `Smtp.Port`, `Smtp.Username`, `Smtp.Password`, `Smtp.From` degerlerini doldur
+- `Smtp.To` listesine alici mail adreslerini yaz
