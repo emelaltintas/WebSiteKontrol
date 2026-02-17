@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Giris | Kastamonu Universitesi Web Durum Takibi</title>
+    <link rel="stylesheet" href="/css/login.css" />
+</head>
+<body>
+    <div class="page-bg"></div>
+    <main class="layout">
+        <section class="brand-panel">
+            <div class="brand-header">
+                <img src="/images/websitekontrol.png" alt="Logo" class="brand-logo" />
+                <div>
+                    <h1>Kastamonu Universitesi Web Durum Takibi</h1>
+                    <p>Bilgi Islem Daire Baskanligi</p>
+                </div>
+            </div>
+            <div class="brand-copy">
+                <h2>Yalnizca Yetkili Kullanici Girisi</h2>
+                <p>
+                    Bu sistem kurum ici servis durum takibi icin kullanilir.
+                    Giris icin e-posta/kullanici adi ve parola bilgilerinizi kullanin.
+                </p>
+            </div>
+        </section>
+
+        <section class="card" aria-label="Giris formu">
+            <div class="card-top">
+                <span class="badge">Guvenli Giris</span>
+                <h3>Hesabiniza giris yapin</h3>
+                <p>AD (Active Directory) dogrulamasi ile erisim saglanir.</p>
+            </div>
+
+            <div class="error" id="errorBox">{{ERROR_MESSAGE}}</div>
+
+            <form method="post" action="/login" class="form">
+                <input type="hidden" name="returnUrl" value="{{RETURN_URL}}" />
+
+                <label for="username">E-posta veya Kullanici Adi</label>
+                <input id="username" name="username" type="text" autocomplete="username" placeholder="ornek@kastamonu.edu.tr" required />
+
+                <label for="password">Parola</label>
+                <div class="password-wrap">
+                    <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Parolanizi girin" required />
+                    <button type="button" id="togglePassword" aria-label="Parolayi goster/gizle">Goster</button>
+                </div>
+
+                <button class="submit" type="submit">Giris Yap</button>
+            </form>
+        </section>
+    </main>
+
+    <script>
+        (function () {
+            const errorBox = document.getElementById("errorBox");
+            if (!errorBox.textContent.trim()) {
+                errorBox.style.display = "none";
+            }
+
+            const toggleBtn = document.getElementById("togglePassword");
+            const passwordInput = document.getElementById("password");
+            toggleBtn.addEventListener("click", function () {
+                const isPassword = passwordInput.type === "password";
+                passwordInput.type = isPassword ? "text" : "password";
+                toggleBtn.textContent = isPassword ? "Gizle" : "Goster";
+            });
+        })();
+    </script>
+</body>
+</html>

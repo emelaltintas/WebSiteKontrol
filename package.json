@@ -1,0 +1,10 @@
+{
+  "name": "websitekontrol",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kastamonu Universitesi web durum takibi (AD girisli)",
+  "scripts": {
+    "dev": "./run-local.sh",
+    "start": "./run-local.sh"
+  }
+}
