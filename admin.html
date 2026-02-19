@@ -106,11 +106,30 @@
                 </div>
             </div>
         </section>
+
+        <section class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+            <h2 class="text-lg font-bold">Giris Deneme Loglari</h2>
+            <div class="overflow-auto border border-slate-200 rounded-xl">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50">
+                        <tr class="text-left">
+                            <th class="px-3 py-2">Zaman (UTC)</th>
+                            <th class="px-3 py-2">Kullanici</th>
+                            <th class="px-3 py-2">IP</th>
+                            <th class="px-3 py-2">Durum</th>
+                            <th class="px-3 py-2">Neden</th>
+                        </tr>
+                    </thead>
+                    <tbody id="loginAttemptTbody"></tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
     <script>
         const serverTbody = document.getElementById("serverTbody");
         const siteTbody = document.getElementById("siteTbody");
+        const loginAttemptTbody = document.getElementById("loginAttemptTbody");
         const siteServerId = document.getElementById("siteServerId");
         const serverMenu = document.getElementById("serverMenu");
         const listTitle = document.getElementById("listTitle");
@@ -295,13 +314,37 @@
             });
         }
 
+        function renderLoginAttempts(attempts) {
+            loginAttemptTbody.innerHTML = "";
+            if (!Array.isArray(attempts) || attempts.length === 0) {
+                loginAttemptTbody.innerHTML = '<tr><td colspan="5" class="px-3 py-6 text-center text-slate-400">Kayit yok.</td></tr>';
+                return;
+            }
+
+            for (const item of attempts) {
+                const row = document.createElement("tr");
+                row.className = "border-t";
+                row.innerHTML = `
+                    <td class="px-3 py-2">${item.atUtc || "-"}</td>
+                    <td class="px-3 py-2">${item.loginInput || "-"}</td>
+                    <td class="px-3 py-2">${item.clientIp || "-"}</td>
+                    <td class="px-3 py-2">${item.success ? '<span class="text-emerald-600 font-semibold">BASARILI</span>' : '<span class="text-rose-600 font-semibold">BASARISIZ</span>'}</td>
+                    <td class="px-3 py-2">${item.reason || "-"}</td>
+                `;
+                loginAttemptTbody.appendChild(row);
+            }
+        }
+
         async function refreshAll() {
             try {
-                [servers, sites] = await Promise.all([
+                const [serverData, siteData, loginAttempts] = await Promise.all([
                     apiGet("/api/admin/servers"),
-                    apiGet("/api/admin/sites")
+                    apiGet("/api/admin/sites"),
+                    apiGet("/api/admin/login-attempts")
                 ]);
 
+                servers = serverData;
+                sites = siteData;
                 if (!Array.isArray(servers)) servers = [];
                 if (!Array.isArray(sites)) sites = [];
 
@@ -309,6 +352,7 @@
                 renderServerTable();
                 renderServerMenu();
                 renderSiteTable();
+                renderLoginAttempts(loginAttempts);
                 showStatus(`Sunucu: ${servers.length}, Web kaydi: ${sites.length}`);
             } catch (error) {
                 showStatus(error.message || "Veriler alinamadi.", true);
