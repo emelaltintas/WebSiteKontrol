@@ -58,9 +58,8 @@ public sealed class LdapAuthService : ILdapAuthService
             var response = (SearchResponse)connection.SendRequest(request);
             if (response.Entries.Count == 0)
             {
-                return Task.FromResult(new LdapAuthResult(
-                    true,
-                    new LdapUser(username, username, null)));
+                _logger.LogWarning("LDAP bind basarili fakat kullanici dizinde bulunamadi. LoginInput: {LoginInput}", loginInput);
+                return Task.FromResult(new LdapAuthResult(false, null));
             }
 
             var entry = response.Entries[0];
@@ -94,14 +93,15 @@ public sealed class LdapAuthService : ILdapAuthService
             return loginInput;
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.UpnSuffix))
-        {
-            return $"{username}@{_options.UpnSuffix}";
-        }
-
+        // ADHelper mantigiyla uyum: domain\\username ilk tercih.
         if (!string.IsNullOrWhiteSpace(_options.Domain))
         {
             return $"{_options.Domain}\\{username}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(_options.UpnSuffix))
+        {
+            return $"{username}@{_options.UpnSuffix}";
         }
 
         return username;
