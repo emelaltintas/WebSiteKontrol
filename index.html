@@ -4,22 +4,83 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Web Durum Takibi</title>
-    <link rel="icon" type="image/png" href="/images/websitekontrol.png" />
+    <link rel="icon" type="image/png" href="/images/fav.png" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .pulse { animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: .4 } 50% { opacity: 1 } 100% { opacity: .4 } }
-        .tab-btn.active { background-color: #4f46e5 !important; color: white !important; }
+        .tabs-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            align-items: center;
+        }
+        .tab-btn {
+            position: relative;
+            min-height: 40px;
+            padding: 7px 14px;
+            border-radius: 10px;
+            border: 1px solid #d8e0ea;
+            background: #f7f9fc;
+            color: #324257;
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0;
+            line-height: 1.2;
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-start;
+            transition: border-color .22s ease, background-color .22s ease, color .22s ease, box-shadow .22s ease, transform .16s ease;
+            width: auto;
+            max-width: 100%;
+            white-space: nowrap;
+            text-align: left;
+        }
+        .tab-btn:hover {
+            border-color: #c7d2fe;
+            background: #eef3f9;
+            color: #1f2937;
+            box-shadow: 0 6px 14px rgba(15, 23, 42, .08);
+            transform: translateY(-1px);
+        }
+        .tab-btn:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, .2);
+            border-color: #6366f1;
+        }
+        .tab-btn.active {
+            border-color: #a5b4fc;
+            background: #eef2ff !important;
+            color: #3730a3 !important;
+            box-shadow: inset 0 0 0 1px rgba(99, 102, 241, .18);
+        }
+        @media (max-width: 768px) {
+            .tab-btn {
+                min-height: 38px;
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
         .modal-overlay { background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #f43f5e; border-radius: 10px; }
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+        @media (min-width: 1350px) {
+            .status-grid {
+                grid-template-columns: minmax(0, 2fr) minmax(360px, 1fr);
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
-
-    <div id="manualModal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay hidden">
+    <div id="manualModal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay hidden" onclick="if(event.target===this) toggleModal()">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200 mx-4">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-bold text-slate-900">Manuel Site Kontrolü</h3>
@@ -27,6 +88,7 @@
             </div>
             <input type="text" id="manualUrl" placeholder="https://kastamonu.edu.tr" class="w-full px-4 py-2 rounded-lg border mb-4 outline-none focus:ring-2 focus:ring-indigo-500">
             <button id="runManualCheck" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium">Sorgula</button>
+            <p id="manualResult" class="mt-3 text-sm text-slate-500 hidden"></p>
         </div>
     </div>
 
@@ -35,24 +97,28 @@
             <div class="flex items-center gap-4">
                 <img src="images/websitekontrol.png" alt="Logo" class="w-12 h-12 md:w-16 md:h-16 object-contain" />
                 <div>
-                    <h1 class="text-lg md:text-2xl font-bold text-slate-900">Kastamonu Üniversitesi Web Durum Takibi</h1>
+                    <h1 class="text-lg md:text-2xl font-bold text-slate-900">
+                        Kastamonu Üniversitesi<br class="hidden md:block" /> Web Durum Takibi
+                    </h1>
                     <p class="text-xs md:text-sm text-slate-600 italic">Bilgi İşlem Daire Başkanlığı</p>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <button onclick="toggleModal()" class="px-4 py-2 border-2 border-indigo-600 text-indigo-600 rounded-lg text-sm font-bold hover:bg-indigo-600 hover:text-white transition-all">
-                    🔍 Manuel Kontrol
+            <div class="flex w-full md:w-auto md:ml-auto items-center justify-end gap-2 flex-wrap">
+                <a id="adminLink" href="/admin" class="hidden px-4 py-2 border-2 border-slate-300 bg-white text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-700 hover:text-white transition-all whitespace-nowrap">
+                    Yonetim
+                </a>
+                <button onclick="toggleModal()" class="px-4 py-2 border-2 border-indigo-600 text-indigo-600 rounded-lg text-sm font-bold hover:bg-indigo-600 hover:text-white transition-all inline-flex items-center gap-2 whitespace-nowrap">
+                    <span aria-hidden="true" class="text-base leading-none">🔍</span>
+                    <span class="leading-tight text-left">Manuel Kontrol</span>
                 </button>
-                <form method="post" action="/logout">
-                    <button type="submit" class="px-4 py-2 border-2 border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-700 hover:text-white transition-all">
-                        Çıkış
-                    </button>
-                </form>
+                <a href="/logout" class="px-4 py-2 border-2 border-slate-300 bg-white text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-700 hover:text-white transition-all whitespace-nowrap">
+                    Çıkış
+                </a>
             </div>
         </header>
 
-        <section class="mb-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center gap-8">
+        <section class="mb-10 status-grid">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center gap-8">
                 <div class="w-40 h-40 flex-shrink-0">
                     <canvas id="healthChart"></canvas>
                 </div>
@@ -93,19 +159,19 @@
         </section>
 
         <section class="mb-6">
-            <div class="flex flex-wrap gap-2 mb-4">
-                <button data-group="anasayfa" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Anasayfa</button>
-                <button data-group="fakulte" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Fakülteler</button>
-                <button data-group="ensyo" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Enstitü-Yüksekokullar</button>
-                <button data-group="myo" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Meslek Yüksekokulları</button>
-                <button data-group="koordinator" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Koordinatörlükler</button>
-                <button data-group="aum" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Araştırma Uygulama Merkezleri</button>
-                <button data-group="idari" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">İdari Birimler</button>
-                <button data-group="projelerjoomla" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Projeler Joomla</button>
-                <button data-group="projelerwordpress" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Projeler Wordpress</button>
-                <button data-group="yazilimlarimiz" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Yazılımlarımız</button>
-                <button data-group="diger" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Diğer</button>
-                <button data-group="disyazilimlar" class="tab-btn px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-medium">Dış Yazılımlar</button>
+            <div class="tabs-grid mb-4">
+                <button data-group="anasayfa" class="tab-btn">Anasayfa</button>
+                <button data-group="fakulte" class="tab-btn">Fakülteler</button>
+                <button data-group="ensyo" class="tab-btn">Enstitü-Yüksekokullar</button>
+                <button data-group="myo" class="tab-btn">Meslek Yüksekokulları</button>
+                <button data-group="koordinator" class="tab-btn">Koordinatörlükler</button>
+                <button data-group="aum" class="tab-btn">Araştırma Uygulama Merkezleri</button>
+                <button data-group="idari" class="tab-btn">İdari Birimler</button>
+                <button data-group="projelerjoomla" class="tab-btn">Projeler Joomla</button>
+                <button data-group="projelerwordpress" class="tab-btn">Projeler Wordpress</button>
+                <button data-group="yazilimlarimiz" class="tab-btn">Yazılımlarımız</button>
+                <button data-group="diger" class="tab-btn">Diğer</button>
+                <button data-group="disyazilimlar" class="tab-btn">Dış Yazılımlar</button>
             </div>
             
             <div class="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 mb-4">
@@ -178,7 +244,7 @@
     </div>
 
     <script>
-        const GROUPS = {
+        let GROUPS = {
             anasayfa: ["https://kastamonu.edu.tr"],
             fakulte: ["https://egitim.kastamonu.edu.tr", "https://fen.kastamonu.edu.tr", "https://gstf.kastamonu.edu.tr", "https://iibf.kastamonu.edu.tr", "https://ilahiyat.kastamonu.edu.tr", "https://iletisim.kastamonu.edu.tr", "https://itbf.kastamonu.edu.tr", "https://mmf.kastamonu.edu.tr", "https://orman.kastamonu.edu.tr", "https://sbf.kastamonu.edu.tr", "https://dishek.kastamonu.edu.tr", "https://sporbilimleri.kastamonu.edu.tr", "https://turizm.kastamonu.edu.tr", "https://tip.kastamonu.edu.tr", "https://veteriner.kastamonu.edu.tr"],
             ensyo: ["https://havacilik.kastamonu.edu.tr", "https://ydyo.kastamonu.edu.tr", "https://lisansustu.kastamonu.edu.tr"],
@@ -429,16 +495,61 @@
             const key = u.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
             return SITE_LABELS[key] || key;
         };
+        const normalizeGroupKey = (raw) => {
+            const valid = new Set(["anasayfa", "fakulte", "ensyo", "myo", "koordinator", "aum", "idari", "projelerjoomla", "projelerwordpress", "yazilimlarimiz", "diger", "disyazilimlar"]);
+            const key = (raw || "").toLowerCase();
+            return valid.has(key) ? key : "diger";
+        };
+        const hostFromUrl = (url) => {
+            try {
+                const parsed = new URL(url);
+                return parsed.host;
+            } catch {
+                return url.replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+            }
+        };
 
-        function initChart(up, down) {
+        async function hydrateManagedSites() {
+            try {
+                const meRes = await fetch("/api/me", { cache: "no-store" });
+                if (meRes.ok) {
+                    const me = await meRes.json();
+                    if (me && me.isSuperUser) {
+                        document.getElementById("adminLink").classList.remove("hidden");
+                    }
+                }
+            } catch {}
+
+            try {
+                const res = await fetch("/api/managed-sites", { cache: "no-store" });
+                if (!res.ok) return;
+                const managed = await res.json();
+                if (!Array.isArray(managed)) return;
+
+                for (const item of managed) {
+                    if (!item || !item.url) continue;
+                    const groupKey = normalizeGroupKey(item.groupKey);
+                    if (!GROUPS[groupKey]) GROUPS[groupKey] = [];
+                    if (!GROUPS[groupKey].some(x => x.toLowerCase() === item.url.toLowerCase())) {
+                        GROUPS[groupKey].push(item.url);
+                    }
+                    if (item.siteName) {
+                        SITE_LABELS[hostFromUrl(item.url)] = item.siteName;
+                    }
+                }
+            } catch {}
+        }
+
+        function initChart(total = 1) {
             const ctx = document.getElementById('healthChart').getContext('2d');
+            if (myChart) myChart.destroy();
             myChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Aktif', 'Pasif'],
+                    labels: ['Aktif', 'Pasif', 'Bekleyen'],
                     datasets: [{
-                        data: [up, down],
-                        backgroundColor: ['#10b981', '#f43f5e'],
+                        data: [0, 0, Math.max(total, 1)],
+                        backgroundColor: ['#10b981', '#f43f5e', '#e2e8f0'],
                         borderWidth: 0
                     }]
                 },
@@ -446,14 +557,44 @@
             });
         }
 
+        function updateProgressChart(up, down, total) {
+            if (!myChart) {
+                initChart(total);
+                return;
+            }
+            const safeTotal = Math.max(total, 1);
+            const remaining = Math.max(safeTotal - (up + down), 0);
+            myChart.data.datasets[0].data = [Math.max(up, 0), Math.max(down, 0), remaining];
+            myChart.update('none');
+        }
+
+        async function pingUrl(u, timeoutMs = 8000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                await fetch(u, { mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+                return true;
+            } catch (e) {
+                return false;
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
         async function scanEntireSystem() {
             const allUrls = [...new Set(Object.values(GROUPS).flat())];
             const failedListDiv = document.getElementById('failedList');
             failedListDiv.innerHTML = "";
-            
             const total = allUrls.length;
+            globalUp = 0;
+            globalDown = 0;
+            initChart(total);
             // TOPLAM SAYI UI GÜNCELLEME
             document.getElementById('grandTotalCount').textContent = total;
+            document.getElementById('globalProgressBar').style.width = "0%";
+            document.getElementById('globalProgressText').textContent = "Tarama: %0";
+            document.getElementById('initialLoader').classList.remove('hidden');
+            document.getElementById('healthSummary').classList.add('hidden');
 
             let completed = 0;
             const queue = [...allUrls];
@@ -461,17 +602,19 @@
             async function worker() {
                 while (queue.length > 0) {
                     const u = queue.shift();
+                    const ok = await pingUrl(u, 9000);
                     try {
-                        await fetch(u, { mode: 'no-cors', cache: 'no-store' });
+                        if (!ok) throw new Error("down");
                         globalUp++;
                     } catch (e) {
                         globalDown++;
                         const item = document.createElement('div');
-                        item.className = "p-2 bg-rose-50 border-l-2 border-rose-500 text-rose-800 flex justify-between";
-                        item.innerHTML = `<span>${getSiteLabel(u)}</span> <span class="font-bold text-[10px]">ERİŞİLEMİYOR</span>`;
+                        item.className = "p-2 bg-rose-50 border-l-2 border-rose-500 text-rose-800 grid grid-cols-[1fr_auto] gap-2 items-center";
+                        item.innerHTML = `<span class="break-all">${getSiteLabel(u)}</span> <span class="font-bold text-[10px] whitespace-nowrap">ERİŞİLEMİYOR</span>`;
                         failedListDiv.appendChild(item);
                     }
                     completed++;
+                    updateProgressChart(globalUp, globalDown, total);
                     const pct = Math.round((completed / total) * 100);
                     document.getElementById('globalProgressBar').style.width = pct + "%";
                     document.getElementById('globalProgressText').textContent = `Tarama: %${pct}`;
@@ -484,13 +627,14 @@
             document.getElementById('healthSummary').classList.remove('hidden');
             document.getElementById('totalUpCount').textContent = globalUp;
             document.getElementById('totalDownCount').textContent = globalDown;
-            initChart(globalUp, globalDown);
+            updateProgressChart(globalUp, globalDown, total);
         }
 
         async function checkOne(u) {
             const start = Date.now();
+            const ok = await pingUrl(u, 9000);
             try {
-                await fetch(u, { mode: 'no-cors', cache: 'no-store' });
+                if (!ok) throw new Error("down");
                 updateRow(u, { up: true, latency: Date.now() - start, when: new Date() });
             } catch (e) {
                 updateRow(u, { up: false, latency: null, when: new Date() });
@@ -544,8 +688,55 @@
             });
         });
 
+        async function runManualCheck() {
+            const input = document.getElementById("manualUrl");
+            const result = document.getElementById("manualResult");
+            const button = document.getElementById("runManualCheck");
+            let url = input.value.trim();
+
+            if (!url) {
+                result.textContent = "Lütfen bir URL girin.";
+                result.className = "mt-3 text-sm text-rose-600";
+                return;
+            }
+
+            if (!/^https?:\/\//i.test(url)) {
+                url = `https://${url}`;
+                input.value = url;
+            }
+
+            result.className = "mt-3 text-sm text-slate-500";
+            result.textContent = "Kontrol ediliyor...";
+            button.disabled = true;
+            button.classList.add("opacity-70", "cursor-not-allowed");
+
+            const started = Date.now();
+            try {
+                await fetch(url, { mode: "no-cors", cache: "no-store" });
+                const latency = Date.now() - started;
+                result.textContent = `AKTİF - Yaklaşık ${latency} ms`;
+                result.className = "mt-3 text-sm text-emerald-600";
+            } catch (e) {
+                result.textContent = "PASİF - Erişilemiyor veya yanıt alınamadı.";
+                result.className = "mt-3 text-sm text-rose-600";
+            } finally {
+                button.disabled = false;
+                button.classList.remove("opacity-70", "cursor-not-allowed");
+            }
+        }
+
         function toggleModal() { document.getElementById('manualModal').classList.toggle('hidden'); }
-        window.addEventListener("DOMContentLoaded", scanEntireSystem);
+        window.addEventListener("DOMContentLoaded", async () => {
+            await hydrateManagedSites();
+            scanEntireSystem();
+            document.getElementById("runManualCheck").addEventListener("click", runManualCheck);
+            document.getElementById("manualUrl").addEventListener("keydown", (event) => {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    runManualCheck();
+                }
+            });
+        });
     </script>
 </body>
 </html>

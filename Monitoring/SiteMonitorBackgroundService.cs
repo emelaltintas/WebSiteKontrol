@@ -8,6 +8,9 @@ namespace WebSiteKontrol.Monitoring;
 
 public sealed class SiteMonitorBackgroundService : BackgroundService
 {
+    private const string UbysHost = "ubys.kastamonu.edu.tr";
+    private const string UbysSupportEmail = "ubysdestek@kastamonu.edu.tr";
+
     private static readonly Regex UrlRegex = new(
         @"https?://[a-zA-Z0-9\.-]+(?:/[^\s""'<>]*)?",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -17,6 +20,7 @@ public sealed class SiteMonitorBackgroundService : BackgroundService
     private readonly IWebHostEnvironment _environment;
     private readonly IOptionsMonitor<SiteMonitorOptions> _monitorOptions;
     private readonly IOptionsMonitor<SmtpOptions> _smtpOptions;
+    private readonly ManagedSiteRegistry _managedSiteRegistry;
     private readonly ConcurrentDictionary<string, bool> _latestStates = new(StringComparer.OrdinalIgnoreCase);
     private List<string> _urls = new();
 
@@ -25,13 +29,15 @@ public sealed class SiteMonitorBackgroundService : BackgroundService
         IHttpClientFactory httpClientFactory,
         IWebHostEnvironment environment,
         IOptionsMonitor<SiteMonitorOptions> monitorOptions,
-        IOptionsMonitor<SmtpOptions> smtpOptions)
+        IOptionsMonitor<SmtpOptions> smtpOptions,
+        ManagedSiteRegistry managedSiteRegistry)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
         _environment = environment;
         _monitorOptions = monitorOptions;
         _smtpOptions = smtpOptions;
+        _managedSiteRegistry = managedSiteRegistry;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -44,13 +50,13 @@ public sealed class SiteMonitorBackgroundService : BackgroundService
         }
 
         _urls = LoadUrlsFromSource(options.SourceFile);
-        if (_urls.Count == 0)
+        if (_urls.Count == 0 && _managedSiteRegistry.GetUrls().Count == 0)
         {
             _logger.LogWarning("Izleme URL listesi bos. SourceFile: {SourceFile}", options.SourceFile);
             return;
         }
 
-        _logger.LogInformation("Background monitor basladi. Izlenen URL sayisi: {Count}", _urls.Count);
+        _logger.LogInformation("Background monitor basladi.");
         await RunScanCycle(stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -67,8 +73,13 @@ public sealed class SiteMonitorBackgroundService : BackgroundService
         var parallelism = Math.Max(1, options.MaxParallelChecks);
         var downCount = 0;
 
+        var scanUrls = _urls
+            .Concat(_managedSiteRegistry.GetUrls())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         await Parallel.ForEachAsync(
-            _urls,
+            scanUrls,
             new ParallelOptions
             {
                 MaxDegreeOfParallelism = parallelism,
@@ -102,7 +113,7 @@ public sealed class SiteMonitorBackgroundService : BackgroundService
 
         _logger.LogInformation(
             "Izleme dongusu tamamlandi. Toplam: {Total}, Pasif: {Down}, Zaman: {Time}",
-            _urls.Count,
+            scanUrls.Count,
             downCount,
             DateTime.Now);
     }
@@ -168,6 +179,14 @@ public sealed class SiteMonitorBackgroundService : BackgroundService
         foreach (var recipient in smtp.To.Where(x => !string.IsNullOrWhiteSpace(x)))
         {
             message.To.Add(recipient.Trim());
+        }
+
+        if (!isRecovery &&
+            Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+            string.Equals(uri.Host, UbysHost, StringComparison.OrdinalIgnoreCase) &&
+            !message.To.Cast<MailAddress>().Any(x => string.Equals(x.Address, UbysSupportEmail, StringComparison.OrdinalIgnoreCase)))
+        {
+            message.To.Add(UbysSupportEmail);
         }
 
         if (message.To.Count == 0)

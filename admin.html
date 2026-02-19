@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Yonetim Paneli</title>
+    <link rel="icon" type="image/png" href="/images/fav.png" />
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div class="max-w-7xl mx-auto p-6 space-y-6">
+        <header class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">Yonetim Paneli</h1>
+                <p class="text-sm text-slate-500">Sunucu ve web sayfasi yonetimini tek ekrandan yapin.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/" class="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-sm font-semibold">Ana Sayfa</a>
+                <a href="/logout" class="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-sm font-semibold">Cikis</a>
+            </div>
+        </header>
+
+        <section class="grid lg:grid-cols-2 gap-4">
+            <article class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+                <h2 class="text-lg font-bold">Sunucu Yonetim Sistemi</h2>
+                <p class="text-sm text-slate-500">Sunucu adi, IP, kullanici bilgisi ve notlari burada tutulur.</p>
+                <div class="grid md:grid-cols-2 gap-3">
+                    <input id="srvName" class="border rounded-lg px-3 py-2" placeholder="Sunucu adi" />
+                    <input id="srvIp" class="border rounded-lg px-3 py-2" placeholder="Sunucu IP" />
+                    <input id="srvUser" class="border rounded-lg px-3 py-2" placeholder="Kullanici adi" />
+                    <input id="srvPass" type="password" class="border rounded-lg px-3 py-2" placeholder="Parola" />
+                </div>
+                <input id="srvNotes" class="w-full border rounded-lg px-3 py-2" placeholder="Notlar (opsiyonel)" />
+                <button id="saveServerBtn" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">Sunucu Kaydet</button>
+                <div class="overflow-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50">
+                            <tr class="text-left">
+                                <th class="px-3 py-2">Sunucu</th>
+                                <th class="px-3 py-2">Kullanici</th>
+                                <th class="px-3 py-2 text-right">Islem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="serverTbody"></tbody>
+                    </table>
+                </div>
+            </article>
+
+            <article class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+                <h2 class="text-lg font-bold">Web Sayfasi Yonetim Sistemi</h2>
+                <p class="text-sm text-slate-500">Birim, URL ve sorumlu bilgilerini sunucuya baglayarak kaydedin.</p>
+                <div class="grid md:grid-cols-2 gap-3">
+                    <input id="siteUnit" class="border rounded-lg px-3 py-2" placeholder="Birim adi" />
+                    <input id="siteName" class="border rounded-lg px-3 py-2" placeholder="Web sayfasi adi" />
+                    <input id="siteUrl" class="border rounded-lg px-3 py-2" placeholder="URL" />
+                    <select id="siteGroup" class="border rounded-lg px-3 py-2">
+                        <option value="idari">Idari Birimler</option>
+                        <option value="fakulte">Fakulteler</option>
+                        <option value="ensyo">Enstitu-Yuksekokullar</option>
+                        <option value="myo">Meslek Yuksekokullari</option>
+                        <option value="koordinator">Koordinatorlukler</option>
+                        <option value="aum">Arastirma Uygulama Merkezleri</option>
+                        <option value="projelerjoomla">Projeler Joomla</option>
+                        <option value="projelerwordpress">Projeler Wordpress</option>
+                        <option value="yazilimlarimiz">Yazilimlarimiz</option>
+                        <option value="disyazilimlar">Dis Yazilimlar</option>
+                        <option value="diger" selected>Diger</option>
+                    </select>
+                    <select id="siteServerId" class="border rounded-lg px-3 py-2 md:col-span-2"></select>
+                    <input id="siteRespName" class="border rounded-lg px-3 py-2" placeholder="Web sorumlusu" />
+                    <input id="siteRespTitle" class="border rounded-lg px-3 py-2" placeholder="Unvan" />
+                    <input id="siteRespEmail" class="border rounded-lg px-3 py-2" placeholder="E-posta" />
+                    <input id="siteRespPhone" class="border rounded-lg px-3 py-2" placeholder="Telefon" />
+                </div>
+                <button id="saveSiteBtn" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">Web Kaydi Kaydet</button>
+            </article>
+        </section>
+
+        <section class="grid lg:grid-cols-[280px_1fr] gap-4">
+            <aside class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm h-fit">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg font-bold">Sunucu Menusu</h2>
+                    <button id="refreshBtn" class="px-2 py-1 rounded border border-slate-300 text-xs font-semibold hover:bg-slate-100">Yenile</button>
+                </div>
+                <div id="serverMenu" class="space-y-2"></div>
+            </aside>
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <h2 id="listTitle" class="text-lg font-bold">Tum Web Kayitlari</h2>
+                    <div id="statusMessage" class="text-sm text-slate-500"></div>
+                </div>
+                <div class="overflow-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50">
+                            <tr class="text-left">
+                                <th class="px-3 py-2">Web Sayfasi</th>
+                                <th class="px-3 py-2">Birim</th>
+                                <th class="px-3 py-2">Sunucu</th>
+                                <th class="px-3 py-2">Sorumlu</th>
+                                <th class="px-3 py-2">Iletisim</th>
+                                <th class="px-3 py-2 text-right">Islem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="siteTbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const serverTbody = document.getElementById("serverTbody");
+        const siteTbody = document.getElementById("siteTbody");
+        const siteServerId = document.getElementById("siteServerId");
+        const serverMenu = document.getElementById("serverMenu");
+        const listTitle = document.getElementById("listTitle");
+        const statusMessage = document.getElementById("statusMessage");
+
+        let servers = [];
+        let sites = [];
+        let selectedServerMenu = "all";
+
+        function showStatus(message, isError = false) {
+            statusMessage.textContent = message;
+            statusMessage.className = isError ? "text-sm text-rose-600" : "text-sm text-emerald-600";
+        }
+
+        function serverLabel(server) {
+            return `${server.name} (${server.ipAddress})`;
+        }
+
+        async function apiGet(url) {
+            const response = await fetch(url, { cache: "no-store" });
+            if (!response.ok) throw new Error("Istek basarisiz.");
+            return response.json();
+        }
+
+        async function apiSend(url, method, data) {
+            const response = await fetch(url, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+
+            if (!response.ok) {
+                const body = await response.text();
+                throw new Error(body || "Istek basarisiz.");
+            }
+
+            return response.json();
+        }
+
+        async function apiDelete(url) {
+            const response = await fetch(url, { method: "DELETE" });
+            if (!response.ok) {
+                const body = await response.text();
+                throw new Error(body || "Silme basarisiz.");
+            }
+        }
+
+        function renderServerDropdown() {
+            siteServerId.innerHTML = '<option value="">Sunucu seciniz</option>';
+            for (const server of servers) {
+                const option = document.createElement("option");
+                option.value = server.id;
+                option.textContent = serverLabel(server);
+                siteServerId.appendChild(option);
+            }
+        }
+
+        function renderServerTable() {
+            serverTbody.innerHTML = "";
+            if (servers.length === 0) {
+                serverTbody.innerHTML = '<tr><td colspan="3" class="px-3 py-6 text-center text-slate-400">Sunucu kaydi yok.</td></tr>';
+                return;
+            }
+
+            for (const server of servers) {
+                const tr = document.createElement("tr");
+                tr.className = "border-t";
+                tr.innerHTML = `
+                    <td class="px-3 py-2">
+                        <div class="font-semibold">${server.name}</div>
+                        <div class="text-xs text-slate-500">${server.ipAddress}</div>
+                    </td>
+                    <td class="px-3 py-2">${server.username || "-"}</td>
+                    <td class="px-3 py-2 text-right">
+                        <button data-id="${server.id}" class="server-delete px-2 py-1 rounded border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-semibold">Sil</button>
+                    </td>
+                `;
+                serverTbody.appendChild(tr);
+            }
+
+            document.querySelectorAll(".server-delete").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const id = btn.getAttribute("data-id");
+                    if (!id || !confirm("Sunucu kaydi silinsin mi?")) return;
+                    try {
+                        await apiDelete(`/api/admin/servers?id=${encodeURIComponent(id)}`);
+                        showStatus("Sunucu kaydi silindi.");
+                        await refreshAll();
+                    } catch (error) {
+                        showStatus(error.message || "Sunucu silinemedi.", true);
+                    }
+                });
+            });
+        }
+
+        function renderServerMenu() {
+            const countByServerId = new Map();
+            for (const site of sites) {
+                countByServerId.set(site.serverId, (countByServerId.get(site.serverId) || 0) + 1);
+            }
+
+            serverMenu.innerHTML = "";
+
+            const allButton = document.createElement("button");
+            allButton.className = `w-full text-left px-3 py-2 rounded-lg border text-sm ${selectedServerMenu === "all" ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:bg-slate-50"}`;
+            allButton.textContent = `Tum Sunucular (${sites.length})`;
+            allButton.onclick = () => {
+                selectedServerMenu = "all";
+                renderServerMenu();
+                renderSiteTable();
+            };
+            serverMenu.appendChild(allButton);
+
+            for (const server of servers) {
+                const count = countByServerId.get(server.id) || 0;
+                const button = document.createElement("button");
+                button.className = `w-full text-left px-3 py-2 rounded-lg border text-sm flex items-center justify-between ${selectedServerMenu === server.id ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:bg-slate-50"}`;
+                button.innerHTML = `<span class="truncate pr-2">${serverLabel(server)}</span><span class="text-xs font-semibold">${count}</span>`;
+                button.onclick = () => {
+                    selectedServerMenu = server.id;
+                    renderServerMenu();
+                    renderSiteTable();
+                };
+                serverMenu.appendChild(button);
+            }
+        }
+
+        function renderSiteTable() {
+            siteTbody.innerHTML = "";
+            const serverMap = new Map(servers.map(s => [s.id, s]));
+            const filtered = selectedServerMenu === "all"
+                ? sites
+                : sites.filter(x => x.serverId === selectedServerMenu);
+
+            if (selectedServerMenu === "all") {
+                listTitle.textContent = "Tum Web Kayitlari";
+            } else {
+                const selectedServer = serverMap.get(selectedServerMenu);
+                listTitle.textContent = selectedServer ? serverLabel(selectedServer) : "Web Kayitlari";
+            }
+
+            if (filtered.length === 0) {
+                siteTbody.innerHTML = '<tr><td colspan="6" class="px-3 py-6 text-center text-slate-400">Web kaydi yok.</td></tr>';
+                return;
+            }
+
+            for (const site of filtered) {
+                const server = serverMap.get(site.serverId);
+                const tr = document.createElement("tr");
+                tr.className = "border-t";
+                tr.innerHTML = `
+                    <td class="px-3 py-2">
+                        <a class="text-indigo-600 underline font-medium" href="${site.url}" target="_blank">${site.siteName || site.url}</a>
+                        <div class="text-xs text-slate-500">${site.url}</div>
+                    </td>
+                    <td class="px-3 py-2">${site.unitName || "-"}</td>
+                    <td class="px-3 py-2">${server ? serverLabel(server) : "-"}</td>
+                    <td class="px-3 py-2">${site.responsibleName || "-"}</td>
+                    <td class="px-3 py-2">
+                        <div>${site.responsibleTitle || "-"}</div>
+                        <div class="text-xs text-slate-500">${site.responsibleEmail || "-"} ${site.responsiblePhone ? `| ${site.responsiblePhone}` : ""}</div>
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                        <button data-id="${site.id}" class="site-delete px-2 py-1 rounded border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-semibold">Sil</button>
+                    </td>
+                `;
+                siteTbody.appendChild(tr);
+            }
+
+            document.querySelectorAll(".site-delete").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const id = btn.getAttribute("data-id");
+                    if (!id || !confirm("Web kaydi silinsin mi?")) return;
+                    try {
+                        await apiDelete(`/api/admin/sites?id=${encodeURIComponent(id)}`);
+                        showStatus("Web kaydi silindi.");
+                        await refreshAll();
+                    } catch (error) {
+                        showStatus(error.message || "Web kaydi silinemedi.", true);
+                    }
+                });
+            });
+        }
+
+        async function refreshAll() {
+            try {
+                [servers, sites] = await Promise.all([
+                    apiGet("/api/admin/servers"),
+                    apiGet("/api/admin/sites")
+                ]);
+
+                if (!Array.isArray(servers)) servers = [];
+                if (!Array.isArray(sites)) sites = [];
+
+                renderServerDropdown();
+                renderServerTable();
+                renderServerMenu();
+                renderSiteTable();
+                showStatus(`Sunucu: ${servers.length}, Web kaydi: ${sites.length}`);
+            } catch (error) {
+                showStatus(error.message || "Veriler alinamadi.", true);
+            }
+        }
+
+        document.getElementById("saveServerBtn").addEventListener("click", async () => {
+            const payload = {
+                name: document.getElementById("srvName").value.trim(),
+                ipAddress: document.getElementById("srvIp").value.trim(),
+                username: document.getElementById("srvUser").value.trim(),
+                password: document.getElementById("srvPass").value,
+                notes: document.getElementById("srvNotes").value.trim(),
+            };
+
+            if (!payload.name || !payload.ipAddress) {
+                showStatus("Sunucu adi ve IP zorunludur.", true);
+                return;
+            }
+
+            try {
+                await apiSend("/api/admin/servers", "POST", payload);
+                showStatus("Sunucu kaydi eklendi.");
+                document.getElementById("srvName").value = "";
+                document.getElementById("srvIp").value = "";
+                document.getElementById("srvUser").value = "";
+                document.getElementById("srvPass").value = "";
+                document.getElementById("srvNotes").value = "";
+                await refreshAll();
+            } catch (error) {
+                showStatus(error.message || "Sunucu kaydedilemedi.", true);
+            }
+        });
+
+        document.getElementById("saveSiteBtn").addEventListener("click", async () => {
+            const payload = {
+                unitName: document.getElementById("siteUnit").value.trim(),
+                siteName: document.getElementById("siteName").value.trim(),
+                url: document.getElementById("siteUrl").value.trim(),
+                groupKey: document.getElementById("siteGroup").value,
+                serverId: document.getElementById("siteServerId").value,
+                responsibleName: document.getElementById("siteRespName").value.trim(),
+                responsibleTitle: document.getElementById("siteRespTitle").value.trim(),
+                responsibleEmail: document.getElementById("siteRespEmail").value.trim(),
+                responsiblePhone: document.getElementById("siteRespPhone").value.trim(),
+            };
+
+            if (!payload.unitName || !payload.url) {
+                showStatus("Birim adi ve URL zorunludur.", true);
+                return;
+            }
+
+            try {
+                await apiSend("/api/admin/sites", "POST", payload);
+                showStatus("Web kaydi eklendi.");
+                document.getElementById("siteUnit").value = "";
+                document.getElementById("siteName").value = "";
+                document.getElementById("siteUrl").value = "";
+                document.getElementById("siteRespName").value = "";
+                document.getElementById("siteRespTitle").value = "";
+                document.getElementById("siteRespEmail").value = "";
+                document.getElementById("siteRespPhone").value = "";
+                await refreshAll();
+            } catch (error) {
+                showStatus(error.message || "Web kaydi kaydedilemedi.", true);
+            }
+        });
+
+        document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+        refreshAll();
+    </script>
+</body>
+</html>
