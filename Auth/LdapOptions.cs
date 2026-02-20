@@ -10,6 +10,6 @@ public sealed class LdapOptions
     public string BaseDn { get; set; } = "DC=kastamonu,DC=local";
     public string Domain { get; set; } = "kastamonu";
     public string UpnSuffix { get; set; } = "kastamonu.edu.tr";
-    public string AuthType { get; set; } = "Negotiate";
+    public string AuthType { get; set; } = "Basic";
     public int TimeoutSeconds { get; set; } = 8;
 }

@@ -56,8 +56,16 @@
     <script>
         (function () {
             const errorBox = document.getElementById("errorBox");
-            if (!errorBox.textContent.trim()) {
+            const hasError = !!errorBox.textContent.trim();
+            if (!hasError) {
                 errorBox.style.display = "none";
+            } else {
+                // Refreshte ayni hata tekrar gorunmesin diye URL'den error parametresini temizle.
+                const cleanedUrl = new URL(window.location.href);
+                if (cleanedUrl.searchParams.has("error")) {
+                    cleanedUrl.searchParams.delete("error");
+                    window.history.replaceState({}, document.title, cleanedUrl.pathname + cleanedUrl.search);
+                }
             }
 
             const toggleBtn = document.getElementById("togglePassword");
