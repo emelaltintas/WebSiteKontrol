@@ -26,23 +26,64 @@ public sealed class LdapAuthService : ILdapAuthService
         {
             var loginInput = usernameOrEmail.Trim();
             var username = GetUsername(loginInput);
-            var bindIdentity = BuildBindIdentity(loginInput, username);
             var ldapIdentifier = new LdapDirectoryIdentifier(_options.Server, _options.Port);
+            var bindCandidates = BuildBindCandidates(loginInput, username);
+            var authTypes = ResolveAuthTypeCandidates(_options.AuthType);
+            LdapConnection? boundConnection = null;
+            Exception? lastBindException = null;
 
-            using var connection = new LdapConnection(ldapIdentifier)
+            foreach (var authType in authTypes)
             {
-                AuthType = ResolveAuthType(_options.AuthType),
-                Timeout = TimeSpan.FromSeconds(Math.Max(3, _options.TimeoutSeconds)),
-                Credential = new NetworkCredential(bindIdentity, password),
-            };
+                foreach (var bindIdentity in bindCandidates)
+                {
+                    try
+                    {
+                        var connection = new LdapConnection(ldapIdentifier)
+                        {
+                            AuthType = authType,
+                            Timeout = TimeSpan.FromSeconds(Math.Max(3, _options.TimeoutSeconds)),
+                            Credential = new NetworkCredential(bindIdentity, password),
+                        };
 
-            connection.SessionOptions.ProtocolVersion = 3;
-            if (_options.UseSsl)
-            {
-                connection.SessionOptions.SecureSocketLayer = true;
+                        connection.SessionOptions.ProtocolVersion = 3;
+                        if (_options.UseSsl)
+                        {
+                            connection.SessionOptions.SecureSocketLayer = true;
+                        }
+
+                        connection.Bind();
+                        boundConnection = connection;
+                        _logger.LogInformation("LDAP bind basarili. AuthType: {AuthType}, Identity: {Identity}", authType, bindIdentity);
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastBindException = ex;
+                        _logger.LogDebug(ex, "LDAP bind denemesi basarisiz. AuthType: {AuthType}, Identity: {Identity}", authType, bindIdentity);
+                    }
+                }
+
+                if (boundConnection is not null)
+                {
+                    break;
+                }
             }
 
-            connection.Bind();
+            if (boundConnection is null)
+            {
+                if (lastBindException is LdapException ldapEx)
+                {
+                    _logger.LogWarning(ldapEx, "LDAP giris basarisiz oldu. Sunucu: {Server}", _options.Server);
+                }
+                else if (lastBindException is not null)
+                {
+                    _logger.LogError(lastBindException, "LDAP bind sirasinda beklenmeyen hata.");
+                }
+
+                return Task.FromResult(new LdapAuthResult(false, null));
+            }
+
+            using var connectionInUse = boundConnection;
 
             var escapedUsername = EscapeFilterValue(username);
             var escapedLoginInput = EscapeFilterValue(loginInput);
@@ -55,7 +96,7 @@ public sealed class LdapAuthService : ILdapAuthService
                 SearchScope.Subtree,
                 new[] { "sAMAccountName", "displayName", "givenName", "sn", "mail" });
 
-            var response = (SearchResponse)connection.SendRequest(request);
+            var response = (SearchResponse)connectionInUse.SendRequest(request);
             if (response.Entries.Count == 0)
             {
                 _logger.LogWarning("LDAP bind basarili fakat kullanici dizinde bulunamadi. LoginInput: {LoginInput}", loginInput);
@@ -86,25 +127,35 @@ public sealed class LdapAuthService : ILdapAuthService
         }
     }
 
-    private string BuildBindIdentity(string loginInput, string username)
+    private IReadOnlyList<string> BuildBindCandidates(string loginInput, string username)
     {
-        if (loginInput.Contains('@', StringComparison.Ordinal))
-        {
-            return loginInput;
-        }
+        var candidates = new List<string>();
 
-        // ADHelper mantigiyla uyum: domain\\username ilk tercih.
+        // ADHelper ile uyumlu: domain\\username ilk tercih.
         if (!string.IsNullOrWhiteSpace(_options.Domain))
         {
-            return $"{_options.Domain}\\{username}";
+            candidates.Add($"{_options.Domain}\\{username}");
         }
 
         if (!string.IsNullOrWhiteSpace(_options.UpnSuffix))
         {
-            return $"{username}@{_options.UpnSuffix}";
+            candidates.Add($"{username}@{_options.UpnSuffix}");
         }
 
-        return username;
+        if (!string.IsNullOrWhiteSpace(loginInput))
+        {
+            candidates.Add(loginInput);
+        }
+
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            candidates.Add(username);
+        }
+
+        return candidates
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static string GetUsername(string loginInput)
@@ -129,10 +180,15 @@ public sealed class LdapAuthService : ILdapAuthService
         return values[0]?.ToString();
     }
 
-    private static AuthType ResolveAuthType(string authType) =>
-        authType.Equals("basic", StringComparison.OrdinalIgnoreCase)
-            ? AuthType.Basic
-            : AuthType.Negotiate;
+    private static IReadOnlyList<AuthType> ResolveAuthTypeCandidates(string authType)
+    {
+        if (authType.Equals("basic", StringComparison.OrdinalIgnoreCase))
+        {
+            return new[] { AuthType.Basic, AuthType.Negotiate };
+        }
+
+        return new[] { AuthType.Negotiate, AuthType.Basic };
+    }
 
     private static string EscapeFilterValue(string value) =>
         value
